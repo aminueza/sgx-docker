@@ -30,9 +30,7 @@ $ docker pull aminueza/docker-sgx
 ## Download Dockerfile
 
 ```bash
-$ git clone https://git.lsd.ufcg.edu.br/secure-cloud/sgx-apps.git sgx-docker
-$ cd sgx-docker
-$ git checkout sgx-docker
+$ git clone https://github.com/aminueza/sgx-docker.git
 $ rm -rf 00*.patch
 ```
 
