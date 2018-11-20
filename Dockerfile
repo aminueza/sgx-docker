@@ -1,53 +1,42 @@
-FROM aminueza/docker-sgx
+#An environment to run sgx applications
 
-RUN apt-get update
+FROM ubuntu:14.04
 
-USER root
-#Hello World App
-WORKDIR /home/sgx/app
-RUN git clone -b hello-world https://amandasouza:BF5-ZUGPZFzyjF9cs7_X@git.lsd.ufcg.edu.br/secure-cloud/sgx-apps.git hello-world
-WORKDIR /home/sgx/app/hello-world 
-RUN SGX_MODE=HW SGX_DEBUG=1 make
-RUN printf "#!/bin/bash\n/opt/intel/sgxpsw/aesm/aesm_service &\nsleep 1s\ncd /home/sgx/app/hello-world/\n./app_final" > ~/run.sh && \
-    chmod +x ~/run.sh
+MAINTAINER Amanda Souza <amandasouza@cpin.ufcg.edu.br>
 
-#Simple Remote Attestation App
-#WORKDIR /home/sgx/app
-#RUN git clone -b remote-attestation-sample https://amandasouza:BF5-ZUGPZFzyjF9cs7_X@git.lsd.ufcg.edu.br/secure-cloud/sgx-apps.git remote-attestation-sample
-#WORKDIR /home/sgx/app/remote-attestation-sample
-#RUN SGX_MODE=HW SGX_DEBUG=1 make
-#RUN printf "#!/bin/bash\n/opt/intel/sgxpsw/aesm/aesm_service &\nsleep 1s\ncd /home/sgx/app/remote-attestation-sample/\n./app_final" > ~/run.sh && \
-#    chmod +x ~/run.sh
+ARG SGX_VERSION
 
-#Sac2017 App
-#WORKDIR /home/sgx/app
-#RUN git clone -b sac2017 https://amandasouza:BF5-ZUGPZFzyjF9cs7_X@git.lsd.ufcg.edu.br/secure-cloud/sgx-apps.git sac2017
-#WORKDIR /home/sgx/app/sac2017/Aggregator
-#RUN SGX_MODE=HW SGX_DEBUG=1 make
-#RUN printf "#!/bin/bash\n/opt/intel/sgxpsw/aesm/aesm_service &\nsleep 1s\ncd /home/sgx/app/sac2017/Aggregator\n./aggregator" > ~/run.sh && \
-#    chmod +x ~/run.sh
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install --no-install-recommends -y software-properties-common && \
+                    add-apt-repository -y ppa:ubuntu-toolchain-r/test && apt-get update && \
+                    apt-get install --no-install-recommends -y git build-essential ocaml automake python autoconf libtool \
+                                         libcurl4-openssl-dev libprotobuf-dev libprotobuf-c0-dev protobuf-compiler curl make \
+                                         unzip wget libssl-dev g++-4.9 g++-5 cmake nano && \
+                                         rm -rf /var/lib/apt/lists/*
 
-#WORKDIR /home/sgx/app/sac2017/SmartMeter
-#RUN SGX_MODE=HW SGX_DEBUG=1 make
-#RUN printf "#!/bin/bash\n/opt/intel/sgxpsw/aesm/aesm_service &\nsleep 1s\ncd /home/sgx/app/sac2017/Aggregator\n./smart-meter" > ~/run.sh && \
-#    chmod +x ~/run.sh
+#Install SGX Drivers and PSW/SDK
+WORKDIR /home/sgx/drivers
+RUN wget https://github.com/01org/linux-sgx/archive/sgx_"$SGX_VERSION".tar.gz && \
+    tar -xf sgx_"$SGX_VERSION".tar.gz && rm -rf sgx_"$SGX_VERSION".tar.gz
+WORKDIR /home/sgx/drivers/linux-sgx-sgx_"$SGX_VERSION"/
 
-#Simple Remote Attestation App
-#WORKDIR /home/sgx/app
-#RUN git clone -b remote-attestation https://amandasouza:BF5-ZUGPZFzyjF9cs7_X@git.lsd.ufcg.edu.br/secure-cloud/sgx-apps.git remote-attestation
-#WORKDIR /home/sgx/app/remote-attestation/SP
-#RUN cp -r /home/sgx/drivers/restbed/build/librestbed.so* .
-#RUN make SGX_MODE=HW SGX_DEBUG=1 RESTBED_PATH=/home/sgx/drivers/restbed
-#RUN printf "#!/bin/bash\n/opt/intel/sgxpsw/aesm/aesm_service &\nsleep 1s\ncd /home/sgx/app/remote-attestation/SP\n./service-provider" > ~/run.sh && \
-#    chmod +x ~/run.sh
+RUN ./download_prebuilt.sh && \
+    make && \
+    make psw_install_pkg && \
+    make sdk_install_pkg && \
+    mkdir -p /opt/intel && \
+    cd /opt/intel && \
+    /home/sgx/drivers/linux-sgx-sgx_"$SGX_VERSION"/linux/installer/bin/sgx_linux_x64_psw_*.bin && \
+    sh -c 'echo yes | /home/sgx/drivers/linux-sgx-sgx_"$SGX_VERSION"/linux/installer/bin/sgx_linux_x64_sdk_*.bin' && \
+    /bin/bash -c 'source /opt/intel/sgxsdk/environment' && \
+    rm -rf /home/sgx/drivers/*
 
-#Simple Remote Attestation App
-#WORKDIR /home/sgx/app
-#RUN git clone -b remote-attestation https://amandasouza:BF5-ZUGPZFzyjF9cs7_X@git.lsd.ufcg.edu.br/secure-cloud/sgx-apps.git remote-attestation
-#WORKDIR /home/sgx/app/remote-attestation/Client
-#RUN cp -r /home/sgx/drivers/restbed/build/librestbed.so* .
-#RUN make SGX_MODE=HW SGX_DEBUG=1 RESTBED_PATH=/home/sgx/drivers/restbed
-#RUN printf "#!/bin/bash\n/opt/intel/sgxpsw/aesm/aesm_service &\nsleep 1s\ncd /home/sgx/app/remote-attestation/Client\n./client" > ~/run.sh && \
-#    chmod +x ~/run.sh
-	
-CMD ~/run.sh
+RUN apt-get clean && \
+    apt-get autoclean -y && \
+    apt-get autoremove -y  && \
+    rm -rf /bd_build && \
+    rm -rf /tmp/* /var/tmp/* && \
+    rm -rf /var/lib/apt/lists/* && \
+    rm -f /etc/ssh/ssh_host_* && \
+    du -sh /var/cache/apt/archives
+
+CMD ["/bin/bash"]
